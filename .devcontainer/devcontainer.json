@@ -1,9 +1,6 @@
 {
     "name": "Stable Diffusion JupyterLab",
-    "image": "mcr.microsoft.com/devcontainers/python:3.10",
-    "features": {
-        "ghcr.io/nvidia/devcontainers-features/cuda:1": {}
-    },
+    "image": "python:3.10",
     "postCreateCommand": "pip install jupyter jupyterlab torch torchvision torchaudio diffusers transformers accelerate scipy ipywidgets tqdm",
     "customizations": {
         "vscode": {

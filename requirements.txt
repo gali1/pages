@@ -1,4 +1,11 @@
-torch==1.9.0
-torchvision==0.10.0
-numpy==1.21.0
-# Add any other dependencies here
+jupyter
+jupyterlab
+torch
+torchvision
+torchaudio
+diffusers
+transformers
+accelerate
+scipy
+ipywidgets
+tqdm

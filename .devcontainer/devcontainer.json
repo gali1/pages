@@ -1,9 +1,19 @@
 {
   "name": "JupyterLab with LLAMA API",
-  "image": "jupyter/datascience-notebook:latest",
-  "extensions": ["ms-python.python", "jupyter.jupyterlab"],
-  "settings": {
-    "terminal.integrated.shell.linux": "/bin/bash"
+  "image": "python:3.10",
+  "postCreateCommand": "pip install jupyter jupyterlab torch torchvision torchaudio diffusers transformers accelerate scipy ipywidgets tqdm && pip install -r requirements.txt && apt-get install python3-pip && bash install install.sh",
+  "customizations": {
+      "vscode": {
+          "extensions": [
+              "ms-python.python",
+              "ms-toolsai.jupyter",
+              "jupyter.jupyterlab"
+          ]
+      }
   },
-  "postCreateCommand": "pip install -r requirements.txt && jupyter lab --ip 0.0.0.0 --port 8888 --no-browser --allow-root && apt-get install python3-pip && bash install install.sh;"
+  "forwardPorts": [
+      8888,
+      9898
+
+  ]
 }

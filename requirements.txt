@@ -5,7 +5,7 @@ python-dotenv==0.19.1
 aiohttp
 python-dotenv
 hypercorn
-transformer
+transformers
 jupyter
 jupyterlab
 torch

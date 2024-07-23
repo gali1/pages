@@ -2,5 +2,5 @@ Flask==2.0.2
 Werkzeug==2.0.3
 requests==2.26.0
 python-dotenv==0.19.1
-
-/bin/python3 -m pip install Flask==2.0.2 -U --user --force-reinstall --break-system-packages; /bin/python3 -m pip install Werkzeug==2.0.3 -U --user --force-reinstall --break-system-packages; /bin/python3 -m pip install requests==2.26.0 -U --user --force-reinstall --break-system-packages; /bin/python3 -m pip install python-dotenv==0.19.1 -U --user --force-reinstall --break-system-packages
+aiohttp
+python-dotenv hypercorn

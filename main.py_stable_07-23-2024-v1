@@ -29,6 +29,7 @@ import os
 from flask import Flask, render_template, request, jsonify
 import requests
 from dotenv import load_dotenv
+# from werkzeug.urls import quote  # Import quote instead of url_quote
 
 # Load environment variables from .env file
 load_dotenv()
@@ -47,28 +48,22 @@ def index():
 @app.route('/generate', methods=['POST'])
 def generate():
     """Handle POST requests to generate responses using the external API."""
-    try:
-        data = request.json
-        prompt = data.get('prompt', '')
-        model = data.get('model', '')
+    data = request.json
+    prompt = data['prompt']
+    model = data['model']
 
-        if not prompt or not model:
-            raise ValueError("Prompt and model fields are required.")
+    # Send POST request to external API
+    response = requests.post(OLLAMA_API_URL, json={
+        'model': model,
+        'prompt': prompt,
+        'stream': False
+    })
 
-        # Send POST request to external API
-        response = requests.post(OLLAMA_API_URL, json={
-            'model': model,
-            'prompt': prompt,
-            'stream': False
-        })
-
-        # Check response status and return JSON response
-        response.raise_for_status()  # Raise HTTPError for bad responses
-
-        return jsonify({'response': response.json().get('response', '')})
-
-    except (requests.RequestException, ValueError) as e:
-        return jsonify({'error': str(e)}), 400  # Return 400 for client errors
+    # Check response status and return JSON response
+    if response.status_code == 200:
+        return jsonify({'response': response.json()['response']})
+    else:
+        return jsonify({'error': 'Failed to generate response'}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=9898)

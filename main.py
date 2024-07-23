@@ -1,35 +1,9 @@
-"""
-Flask application for handling requests to generate responses using an external API.
-
-This application provides an endpoint '/generate' that accepts POST requests with JSON data
-containing 'prompt' and 'model' parameters. It then sends a request to an external API specified
-by OLLAMA_API_URL to generate a response based on the provided prompt and model.
-
-Dependencies:
-- Flask: Web framework for handling HTTP requests and responses.
-- requests: Library for making HTTP requests to the external API.
-- python-dotenv: Library for reading environment variables from a .env file.
-
-Usage:
-- Ensure Flask and other dependencies are installed (`pip install flask requests python-dotenv`).
-- Set the OLLAMA_API_URL environment variable to specify the external API endpoint.
-
-Endpoints:
-- '/' (GET): Renders the index.html template.
-- '/generate' (POST): Accepts JSON data with 'prompt' and 'model' fields, sends a request to
-  OLLAMA_API_URL, and returns the generated response.
-
-Example:
-curl -X POST http://localhost:8080/generate -H "Content-Type: application/json" \
--d '{"prompt": "Your prompt text here", "model": "Model name here"}'
-
-"""
-
 import os
-import subprocess
 from flask import Flask, render_template, request, jsonify
-import requests
 from dotenv import load_dotenv
+from concurrent.futures import ThreadPoolExecutor
+from transformers import AutoTokenizer, AutoModelForCausalLM
+import torch
 
 # Load environment variables from .env file
 load_dotenv()
@@ -37,42 +11,74 @@ load_dotenv()
 # Initialize Flask application
 app = Flask(__name__)
 
-# Retrieve OLLAMA_API_URL from environment variables, default to local endpoint
-OLLAMA_API_URL = os.getenv("OLLAMA_API_URL", "http://localhost:11434/api/generate")
+# Load model and tokenizer
+MODEL_NAME = os.getenv("MODEL_NAME", "gpt2")  # Default to GPT-2, change as needed
+tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+model = AutoModelForCausalLM.from_pretrained(MODEL_NAME)
 
+# Move model to GPU if available
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model.to(device)
 
-def execute_shell_command():
-    """Function to execute shell command."""
-    command = "fuser -k 9898/tcp; fuser -k 9898/tcp; source ~/.bashrc"
-    subprocess.run(command, shell=True)
+# Create a ThreadPoolExecutor
+executor = ThreadPoolExecutor(max_workers=5)
 
+# Set batch size
+BATCH_SIZE = 128
 
 @app.route("/")
 def index():
     """Render the index.html template."""
     return render_template("index.html")
 
+def generate_response(prompt, max_length=100):
+    """Generate response using the model directly."""
+    try:
+        # Tokenize input
+        input_ids = tokenizer.encode(prompt, return_tensors="pt").to(device)
+        
+        # Generate text in batches
+        output = []
+        for i in range(0, max_length, BATCH_SIZE):
+            batch_length = min(BATCH_SIZE, max_length - i)
+            batch_output = model.generate(
+                input_ids,
+                max_length=input_ids.shape[1] + batch_length,
+                num_return_sequences=1,
+                no_repeat_ngram_size=2,
+                do_sample=True,
+                top_k=50,
+                top_p=0.95,
+                temperature=0.7
+            )
+            
+            # Decode and add to output
+            batch_text = tokenizer.decode(batch_output[0], skip_special_tokens=True)
+            output.append(batch_text[len(prompt):])
+            
+            # Update input_ids for next iteration
+            input_ids = batch_output
+
+        return "".join(output)
+    except Exception as e:
+        print(f"Error generating response: {str(e)}")
+        return None
 
 @app.route("/generate", methods=["POST"])
 def generate():
-    """Handle POST requests to generate responses using the external API."""
+    """Handle POST requests to generate responses."""
     data = request.json
     prompt = data["prompt"]
-    model = data["model"]
+    max_length = data.get("max_length", 100)
 
-    # Send POST request to external API
-    response = requests.post(
-        OLLAMA_API_URL, json={"model": model, "prompt": prompt, "stream": False}
-    )
+    # Use ThreadPoolExecutor to run the generation asynchronously
+    future = executor.submit(generate_response, prompt, max_length)
+    response = future.result()
 
-    # Check response status and return JSON response
-    if response.status_code == 200:
-        return jsonify({"response": response.json()["response"]})
+    if response:
+        return jsonify({"response": response})
     else:
-        # Execute shell command if error response is received
-        execute_shell_command()
         return jsonify({"error": "Error generating response"}), 500
 
-
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=9898)
+    app.run(debug=True, host="0.0.0.0", port=9898, threaded=True)

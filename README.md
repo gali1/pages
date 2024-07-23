@@ -61,35 +61,51 @@ from flask import Flask, render_template, request, jsonify
 import requests
 from dotenv import load_dotenv
 
+# Load environment variables from .env file
 load_dotenv()
 
+# Initialize Flask application
 app = Flask(__name__)
 
+# Retrieve OLLAMA_API_URL from environment variables, default to local endpoint
 OLLAMA_API_URL = os.getenv('OLLAMA_API_URL', 'http://localhost:11434/api/generate')
+
+# Use a requests Session for connection pooling
+session = requests.Session()
 
 @app.route('/')
 def index():
+    """Render the index.html template."""
     return render_template('index.html')
 
 @app.route('/generate', methods=['POST'])
 def generate():
-    data = request.json
-    prompt = data['prompt']
-    model = data['model']
+    """Handle POST requests to generate responses using the external API."""
+    try:
+        data = request.json
+        prompt = data['prompt']
+        model = data['model']
 
-    response = requests.post(OLLAMA_API_URL, json={
-        'model': model,
-        'prompt': prompt,
-        'stream': False
-    })
+        # Send POST request to external API using session
+        response = session.post(OLLAMA_API_URL, json={
+            'model': model,
+            'prompt': prompt,
+            'stream': False
+        })
 
-    if response.status_code == 200:
+        # Check response status and return JSON response
+        response.raise_for_status()
         return jsonify({'response': response.json()['response']})
-    else:
-        return jsonify({'error': 'Failed to generate response'}), 500
+
+    except requests.exceptions.RequestException as e:
+        return jsonify({'error': f'Request to external API failed: {str(e)}'}), 500
+
+    except KeyError as e:
+        return jsonify({'error': f'Missing required parameter: {str(e)}'}), 400
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=8080)
+    # Run the application in production mode
+    app.run(debug=False, host='0.0.0.0', port=9898)
 ```
 
 ### templates/index.html
@@ -102,40 +118,85 @@ if __name__ == '__main__':
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Query Interface</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #1e1e1e;
-            color: #ffffff;
+        /* Reset default margin and padding */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f0f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        
+        .container {
+            max-width: 500px;
+            width: 100%;
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        h1 {
+            font-size: 24px;
+            margin-bottom: 20px;
+            text-align: center;
+            color: #333333;
+        }
+        
         select, textarea, button {
             width: 100%;
             padding: 10px;
-            margin-bottom: 10px;
-            background-color: #2d2d2d;
-            color: #ffffff;
-            border: 1px solid #3d3d3d;
+            margin-bottom: 15px;
+            border: 1px solid #dddddd;
+            border-radius: 4px;
+            background-color: #f5f5f5;
+            font-size: 14px;
+            color: #555555;
         }
+        
+        button {
+            background-color: #007bff;
+            color: #ffffff;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        
+        button:hover {
+            background-color: #0056b3;
+        }
+        
         #response {
+            margin-top: 15px;
+            padding: 15px;
+            background-color: #f5f5f5;
+            border: 1px solid #dddddd;
+            border-radius: 4px;
             white-space: pre-wrap;
-            background-color: #2d2d2d;
-            padding: 10px;
-            border-radius: 5px;
+            font-size: 14px;
+            color: #333333;
         }
     </style>
 </head>
 <body>
-    <h1>AI Query Interface</h1>
-    <select id="model">
-        <option value="llama2">Llama 2</option>
-        <option value="gpt4all">GPT4All</option>
-        <option value="vicuna">Vicuna</option>
-    </select>
-    <textarea id="prompt" rows="4" placeholder="Enter your query here..."></textarea>
-    <button onclick="generateResponse()">Generate Response</button>
-    <div id="response"></div>
+    <div class="container">
+        <h1>AI Query Interface</h1>
+        <select id="model">
+            <option value="llama2">Llama 2</option>
+            <option value="mistral">Mistral</option>
+            <option value="vicuna">Vicuna</option>
+        </select>
+        <textarea id="prompt" rows="4" placeholder="Enter your query here..."></textarea>
+        <button onclick="generateResponse()">Generate Response</button>
+        <div id="response"></div>
+    </div>
 
     <script>
         async function generateResponse() {
@@ -167,14 +228,18 @@ if __name__ == '__main__':
     </script>
 </body>
 </html>
+
 ```
 
 ### requirements.txt
 
 ```
-flask==2.1.0
+Flask==2.0.2
+Werkzeug==2.0.3
 requests==2.26.0
 python-dotenv==0.19.1
+aiohttp
+python-dotenv hypercorn
 ```
 
 ### .env

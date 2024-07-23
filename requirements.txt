@@ -3,4 +3,17 @@ Werkzeug==2.0.3
 requests==2.26.0
 python-dotenv==0.19.1
 aiohttp
-python-dotenv hypercorn
+python-dotenv
+hypercorn
+transformer
+jupyter
+jupyterlab
+torch
+torchvision
+torchaudio
+diffusers
+transformers
+accelerate
+scipy
+ipywidgets
+tqdm

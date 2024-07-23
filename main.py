@@ -29,7 +29,6 @@ import os
 from flask import Flask, render_template, request, jsonify
 import requests
 from dotenv import load_dotenv
-# from werkzeug.urls import quote  # Import quote instead of url_quote
 
 # Load environment variables from .env file
 load_dotenv()
@@ -40,6 +39,9 @@ app = Flask(__name__)
 # Retrieve OLLAMA_API_URL from environment variables, default to local endpoint
 OLLAMA_API_URL = os.getenv('OLLAMA_API_URL', 'http://localhost:11434/api/generate')
 
+# Use a requests Session for connection pooling
+session = requests.Session()
+
 @app.route('/')
 def index():
     """Render the index.html template."""
@@ -48,22 +50,28 @@ def index():
 @app.route('/generate', methods=['POST'])
 def generate():
     """Handle POST requests to generate responses using the external API."""
-    data = request.json
-    prompt = data['prompt']
-    model = data['model']
+    try:
+        data = request.json
+        prompt = data['prompt']
+        model = data['model']
 
-    # Send POST request to external API
-    response = requests.post(OLLAMA_API_URL, json={
-        'model': model,
-        'prompt': prompt,
-        'stream': False
-    })
+        # Send POST request to external API using session
+        response = session.post(OLLAMA_API_URL, json={
+            'model': model,
+            'prompt': prompt,
+            'stream': False
+        })
 
-    # Check response status and return JSON response
-    if response.status_code == 200:
+        # Check response status and return JSON response
+        response.raise_for_status()
         return jsonify({'response': response.json()['response']})
-    else:
-        return jsonify({'error': 'Failed to generate response'}), 500
+
+    except requests.exceptions.RequestException as e:
+        return jsonify({'error': f'Request to external API failed: {str(e)}'}), 500
+
+    except KeyError as e:
+        return jsonify({'error': f'Missing required parameter: {str(e)}'}), 400
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=9898)
+    # Run the application in production mode
+    app.run(debug=False, host='0.0.0.0', port=9898)
